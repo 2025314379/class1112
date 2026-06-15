@@ -1,0 +1,13 @@
+openai>=1.0.0
+scikit-learn>=1.0.0
+numpy>=1.21.0
+fastapi>=0.100.0
+uvicorn>=0.22.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+rich>=13.0.0
+
+# 可选增强依赖 (安装后自动启用更高精度的语义检索)
+# chromadb>=0.4.0
+# sentence-transformers>=2.2.0

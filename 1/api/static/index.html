@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart-CS Agent</title>
+<style>
+  :root {
+    --blue: #007aff;
+    --gray-light: #f5f5f7;
+    --gray-bg: #f2f2f7;
+    --bubble-user: #007aff;
+    --bubble-agent: #e9e9ed;
+    --text: #1d1d1f;
+    --text-sec: #6e6e73;
+    --shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    background: #e8e8ed;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100vh; padding: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .window {
+    width: 440px; max-width: 100%; height: 680px; max-height: 90vh;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.12), 0 0 0 1px rgba(0,0,0,.04);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* --- title bar --- */
+  .titlebar {
+    flex-shrink: 0;
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    padding: 16px 20px 12px;
+    text-align: center;
+    border-bottom: 1px solid rgba(0,0,0,.06);
+  }
+  .titlebar .dots {
+    display: flex; gap: 6px; margin-bottom: 10px;
+  }
+  .titlebar .dots span {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .titlebar .dots .r { background: #ff5f57; }
+  .titlebar .dots .y { background: #febc2e; }
+  .titlebar .dots .g { background: #28c840; }
+  .titlebar .avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: linear-gradient(135deg, #007aff, #5856d6);
+    margin: 0 auto 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: #fff;
+    box-shadow: 0 4px 12px rgba(0,122,255,.3);
+  }
+  .titlebar h2 { font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: -.2px; }
+  .titlebar .status {
+    font-size: 12px; color: #34c759; font-weight: 500; margin-top: 2px;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .titlebar .status::before {
+    content: ''; width: 7px; height: 7px; border-radius: 50%; background: #34c759;
+  }
+
+  /* --- messages --- */
+  .chat-area {
+    flex: 1; overflow-y: auto; padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 10px;
+    background: #fff;
+    scroll-behavior: smooth;
+  }
+  .chat-area::-webkit-scrollbar { width: 4px; }
+  .chat-area::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12); border-radius: 2px; }
+
+  .time-divider {
+    text-align: center; font-size: 11px; color: #8e8e93; padding: 6px 0; letter-spacing: .3px;
+  }
+
+  .msg-row { display: flex; gap: 8px; align-items: flex-end; }
+  .msg-row.user { flex-direction: row-reverse; }
+  .msg-row.agent { flex-direction: row; }
+
+  .msg-row .avatar-mini {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .msg-row.user .avatar-mini { background: #e8e8ed; }
+  .msg-row.agent .avatar-mini { background: linear-gradient(135deg, #007aff, #5856d6); color: #fff; }
+
+  .bubble {
+    max-width: 75%; padding: 10px 14px; border-radius: 18px;
+    font-size: 14px; line-height: 1.55; letter-spacing: -.1px;
+    word-break: break-word; white-space: pre-wrap;
+    position: relative;
+  }
+  .msg-row.user .bubble {
+    background: var(--bubble-user); color: #fff;
+    border-bottom-right-radius: 6px;
+  }
+  .msg-row.agent .bubble {
+    background: var(--bubble-agent); color: var(--text);
+    border-bottom-left-radius: 6px;
+  }
+
+  .bubble .tag-row {
+    display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;
+  }
+  .bubble .tag {
+    display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    letter-spacing: .2px;
+  }
+  .bubble .tag.neg { background: rgba(255,59,48,.15); color: #ff3b30; }
+  .bubble .tag.pos { background: rgba(52,199,89,.15); color: #34c759; }
+  .bubble .tag.kb { background: rgba(0,122,255,.12); color: #007aff; }
+
+  /* typing indicator */
+  .typing .bubble {
+    display: flex; gap: 4px; align-items: center; padding: 14px 16px;
+  }
+  .typing .bubble span {
+    width: 7px; height: 7px; border-radius: 50%; background: #8e8e93;
+    animation: bounce 1.4s infinite ease-in-out both;
+  }
+  .typing .bubble span:nth-child(1) { animation-delay: -.32s; }
+  .typing .bubble span:nth-child(2) { animation-delay: -.16s; }
+  @keyframes bounce {
+    0%,80%,100% { transform: scale(.6); }
+    40% { transform: scale(1); }
+  }
+
+  /* --- input --- */
+  .input-bar {
+    flex-shrink: 0; padding: 10px 16px 16px;
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(0,0,0,.06);
+    display: flex; gap: 8px; align-items: flex-end;
+  }
+  .input-wrap {
+    flex: 1; background: var(--gray-bg); border-radius: 22px;
+    display: flex; align-items: flex-end; padding: 2px;
+    border: 2px solid transparent;
+    transition: border-color .2s, background .2s;
+  }
+  .input-wrap:focus-within { border-color: var(--blue); background: #fff; }
+  .input-wrap textarea {
+    flex: 1; border: none; background: transparent; outline: none;
+    font-size: 14px; padding: 7px 10px; resize: none;
+    font-family: inherit; line-height: 1.4; letter-spacing: -.1px;
+    color: var(--text); max-height: 90px;
+  }
+  .input-wrap textarea::placeholder { color: #8e8e93; }
+
+  .send-btn {
+    width: 36px; height: 36px; border-radius: 50%; border: none;
+    background: var(--blue); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+    transition: transform .15s, opacity .15s, background .15s;
+    box-shadow: 0 2px 8px rgba(0,122,255,.3);
+  }
+  .send-btn:hover { background: #0066d6; transform: scale(1.05); }
+  .send-btn:active { transform: scale(.95); }
+  .send-btn:disabled { opacity: .4; transform: none; box-shadow: none; }
+
+  /* --- bottom --- */
+  .footer {
+    flex-shrink: 0; text-align: center; padding: 6px 16px 10px;
+    font-size: 11px; color: #aeaeb2;
+  }
+  .footer a { color: var(--blue); text-decoration: none; margin: 0 6px; }
+  .footer a:hover { text-decoration: underline; }
+
+  /* --- quick-replies --- */
+  .quick-row {
+    display: flex; gap: 6px; flex-wrap: wrap; padding: 0 18px 4px;
+  }
+  .quick-chip {
+    font-size: 12px; padding: 6px 14px; border-radius: 16px;
+    background: #fff; border: 1px solid rgba(0,0,0,.1); color: var(--blue);
+    cursor: pointer; letter-spacing: -.1px; transition: all .15s;
+    white-space: nowrap;
+  }
+  .quick-chip:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+  /* --- responsive --- */
+  @media (max-width: 480px) {
+    body { padding: 0; }
+    .window { width: 100%; height: 100vh; max-height: 100vh; border-radius: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="window">
+
+  <!-- Title Bar -->
+  <div class="titlebar">
+    <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    <div class="avatar">🤖</div>
+    <h2>Smart-CS</h2>
+    <div class="status">在线</div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area" id="chatArea">
+    <div class="time-divider">今天</div>
+    <div class="msg-row agent">
+      <div class="avatar-mini">🤖</div>
+      <div class="bubble">您好！我是电商智能客服助手，有什么可以帮您？<br>您可以咨询：发货时间、退换货政策、运费、物流查询、库存等。</div>
+    </div>
+  </div>
+
+  <!-- Quick Replies -->
+  <div class="quick-row" id="quickRow">
+    <span class="quick-chip" data-text="退换货政策">退换货政策</span>
+    <span class="quick-chip" data-text="什么时候发货？">什么时候发货？</span>
+    <span class="quick-chip" data-text="顺丰包邮吗？">顺丰包邮吗？</span>
+  </div>
+
+  <!-- Input -->
+  <div class="input-bar">
+    <div class="input-wrap">
+      <textarea id="userInput" rows="1" placeholder="iMessage" autofocus></textarea>
+    </div>
+    <button class="send-btn" id="sendBtn" aria-label="发送">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <a href="/docs" target="_blank">API 文档</a>
+    <span>&middot;</span>
+    <a href="/health" target="_blank">健康检查</a>
+  </div>
+</div>
+
+<script>
+  var input = document.getElementById('userInput');
+  var btn = document.getElementById('sendBtn');
+  var area = document.getElementById('chatArea');
+  var quickRow = document.getElementById('quickRow');
+
+  function autoResize() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 90) + 'px';
+  }
+  input.addEventListener('input', autoResize);
+
+  function scrollDown() {
+    area.scrollTop = area.scrollHeight;
+  }
+
+  function addMsg(role, text, tags) {
+    var row = document.createElement('div');
+    row.className = 'msg-row ' + role;
+
+    var ava = document.createElement('div');
+    ava.className = 'avatar-mini';
+    ava.textContent = role === 'agent' ? '🤖' : '👤';
+
+    var bub = document.createElement('div');
+    bub.className = 'bubble';
+    bub.textContent = text;
+
+    if (tags && tags.length) {
+      var tr = document.createElement('div');
+      tr.className = 'tag-row';
+      tags.forEach(function(t) {
+        var s = document.createElement('span');
+        s.className = 'tag ' + t.cls;
+        s.textContent = t.label;
+        tr.appendChild(s);
+      });
+      bub.appendChild(tr);
+    }
+
+    row.appendChild(ava);
+    row.appendChild(bub);
+    area.appendChild(row);
+    scrollDown();
+  }
+
+  function showTyping() {
+    var row = document.createElement('div');
+    row.className = 'msg-row agent typing';
+    row.id = 'typingRow';
+    var ava = document.createElement('div');
+    ava.className = 'avatar-mini';
+    ava.textContent = '🤖';
+    var bub = document.createElement('div');
+    bub.className = 'bubble';
+    bub.innerHTML = '<span></span><span></span><span></span>';
+    row.appendChild(ava);
+    row.appendChild(bub);
+    area.appendChild(row);
+    scrollDown();
+  }
+
+  function hideTyping() {
+    var el = document.getElementById('typingRow');
+    if (el) el.remove();
+  }
+
+  function send(msg) {
+    msg = (msg || input.value).trim();
+    if (!msg) return;
+
+    input.value = '';
+    autoResize();
+    input.disabled = true;
+    btn.disabled = true;
+
+    addMsg('user', msg);
+    showTyping();
+
+    fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      hideTyping();
+      var tags = [];
+      var emo = data.emotion.emotion;
+      if (emo === 'negative') tags.push({ label: '负向情绪', cls: 'neg' });
+      else if (emo === 'positive') tags.push({ label: '正向情绪', cls: 'pos' });
+      if (data.kb_used && data.kb_used.length) {
+        tags.push({ label: '知识库命中: ' + data.kb_used.join(', '), cls: 'kb' });
+      }
+      addMsg('agent', data.reply, tags);
+    })
+    .catch(function() {
+      hideTyping();
+      addMsg('agent', '抱歉，系统暂时遇到了问题，请稍后再试。');
+    })
+    .finally(function() {
+      input.disabled = false;
+      btn.disabled = false;
+      input.focus();
+    });
+  }
+
+  btn.addEventListener('click', function() { send(); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  // Quick replies
+  quickRow.addEventListener('click', function(e) {
+    var chip = e.target.closest('.quick-chip');
+    if (!chip) return;
+    send(chip.dataset.text);
+  });
+</script>
+</body>
+</html>
